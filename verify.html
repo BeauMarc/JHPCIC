@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>投保信息确认</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="global.css" />
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    投保信息确认
+    <span id="statusTag" class="status-tag status-pending">待确认</span>
+  </div>
+  <div class="content-card">
+    <div id="info" class="info-block">正在加载订单信息...</div>
+    <div class="carousel" id="policyCarousel" style="display:none;">
+      <img id="policyImg" src="" alt="投保单预览" />
+      <div class="carousel-controls">
+        <button id="prevBtn" class="btn-secondary" style="width:48%;">上一页</button>
+        <button id="nextBtn" class="btn-secondary" style="width:48%;">下一页</button>
+      </div>
+      <div class="small" id="pageIndicator"></div>
+    </div>
+    <p class="notice">请仔细核对投保单内容、车牌号、保费金额和保险期限，如有问题请立即联系您的服务人员。</p>
+    <div class="btn-row">
+      <button class="btn-secondary" onclick="history.back()">信息有误</button>
+      <button class="btn-primary" id="confirmBtn">确认无误，去签名</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const SUPABASE_URL = "https://pefccznphgacswztqzrp.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBlZmNjem5waGdhY3N3enRxenJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxNTQwMTgsImV4cCI6MjA3OTczMDAxOH0.nz5gdOBpGzWIRm8qU49O0JFCyMc3csmHwhNA_YkpixY";
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const params = new URLSearchParams(window.location.search);
+  const orderId = params.get("id");
+
+  const infoEl = document.getElementById("info");
+  const statusTag = document.getElementById("statusTag");
+  const carouselEl = document.getElementById("policyCarousel");
+  const imgEl = document.getElementById("policyImg");
+  const prevBtn = document.getElementById("prevBtn");
+  const nextBtn = document.getElementById("nextBtn");
+  const pageIndicator = document.getElementById("pageIndicator");
+  const confirmBtn = document.getElementById("confirmBtn");
+
+  let policyImages = [];
+  let currentIndex = 0;
+  let orderData = null;
+
+  function setStatus(status) {
+    if (status === "pending") {
+      statusTag.textContent = "待确认";
+      statusTag.className = "status-tag status-pending";
+    } else if (status === "signed") {
+      statusTag.textContent = "已签名";
+      statusTag.className = "status-tag status-signed";
+    } else if (status === "paid") {
+      statusTag.textContent = "已支付";
+      statusTag.className = "status-tag status-paid";
+    } else {
+      statusTag.textContent = status || "未知状态";
+    }
+  }
+
+  function renderCarousel() {
+    if (!policyImages || policyImages.length === 0) {
+      carouselEl.style.display = "none";
+      return;
+    }
+    carouselEl.style.display = "block";
+    imgEl.src = policyImages[currentIndex];
+    pageIndicator.textContent = `第 ${currentIndex + 1} / ${policyImages.length} 页`;
+  }
+
+  prevBtn.addEventListener("click", () => {
+    if (!policyImages.length) return;
+    currentIndex = (currentIndex - 1 + policyImages.length) % policyImages.length;
+    renderCarousel();
+  });
+  nextBtn.addEventListener("click", () => {
+    if (!policyImages.length) return;
+    currentIndex = (currentIndex + 1) % policyImages.length;
+    renderCarousel();
+  });
+
+  async function loadOrder() {
+    if (!orderId) {
+      infoEl.textContent = "缺少订单ID";
+      return;
+    }
+    const { data, error } = await supabaseClient
+      .from("insurance_orders")
+      .select("*")
+      .eq("id", orderId)
+      .maybeSingle();
+
+    if (error || !data) {
+      infoEl.textContent = "未找到订单，请联系服务人员。";
+      console.error(error);
+      return;
+    }
+
+    orderData = data;
+    setStatus(data.status);
+
+    const text = 
+      "订单号：" + data.id + "\n" +
+      "车牌号：" + data.plate + "\n" +
+      "应付保费：" + (data.fee != null ? data.fee.toFixed(2) : "") + " 元\n" +
+      "保险期限：" + (data.period || "（见投保单）");
+    infoEl.textContent = text;
+
+    policyImages = Array.isArray(data.policy_images) ? data.policy_images : [];
+    renderCarousel();
+
+    localStorage.setItem("orderId", data.id);
+    localStorage.setItem("plate", data.plate || "");
+    localStorage.setItem("fee", data.fee != null ? data.fee.toFixed(2) : "");
+    localStorage.setItem("period", data.period || "");
+  }
+
+  confirmBtn.addEventListener("click", async () => {
+    if (!orderId) return;
+    const { error } = await supabaseClient
+      .from("insurance_orders")
+      .update({ status: "pending" }) // 状态先保持 pending，签名后再更新
+      .eq("id", orderId);
+    if (error) {
+      alert("更新订单状态失败，请重试或联系服务人员。");
+      return;
+    }
+    window.location.href = "signature.html?id=" + encodeURIComponent(orderId);
+  });
+
+  loadOrder();
+</script>
+</body>
+</html>

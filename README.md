@@ -1,4 +1,3 @@
-[README.md](https://github.com/user-attachments/files/23798463/README.md)
 # AutoPay 人寿支付认证系统（正式版）
 
 基于 Vercel + Supabase 的全静态前端方案，包含：

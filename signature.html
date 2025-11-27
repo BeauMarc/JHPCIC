@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>电子签名确认</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="global.css" />
+  <style>
+    canvas {
+      border: 1px solid #d0d3da;
+      width: 100%;
+      height: 220px;
+      border-radius: 8px;
+      touch-action: none;
+      background: #fafafa;
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    签名确认
+    <span id="statusTag" class="status-tag status-pending">待签名</span>
+  </div>
+  <div class="content-card">
+    <div id="info" class="info-block">正在加载订单信息...</div>
+
+    <p class="small">您可以在下方空白区域手写签名，或上传签名照片。</p>
+    <canvas id="pad"></canvas>
+
+    <label style="margin-top:12px;">或上传签名照片（可选）</label>
+    <input type="file" id="signFile" accept="image/*" />
+    <p class="notice">如已上传签名照片，可不手写；如两者都有，将优先使用上传照片。</p>
+
+    <div class="btn-row">
+      <button class="btn-secondary" id="clearBtn">重签</button>
+      <button class="btn-primary" id="confirmBtn">确认签名并进入支付</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const SUPABASE_URL = "https://pefccznphgacswztqzrp.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBlZmNjem5waGdhY3N3enRxenJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxNTQwMTgsImV4cCI6MjA3OTczMDAxOH0.nz5gdOBpGzWIRm8qU49O0JFCyMc3csmHwhNA_YkpixY";
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const params = new URLSearchParams(window.location.search);
+  const orderId = params.get("id");
+
+  const infoEl = document.getElementById("info");
+  const statusTag = document.getElementById("statusTag");
+  const pad = document.getElementById("pad");
+  const ctx = pad.getContext("2d");
+  const signFileInput = document.getElementById("signFile");
+  const clearBtn = document.getElementById("clearBtn");
+  const confirmBtn = document.getElementById("confirmBtn");
+
+  let drawing = false;
+  let orderData = null;
+
+  function resizeCanvas() {
+    const ratio = window.devicePixelRatio || 1;
+    const width = pad.clientWidth;
+    const height = pad.clientHeight;
+    pad.width = width * ratio;
+    pad.height = height * ratio;
+    ctx.scale(ratio, ratio);
+  }
+
+  function setStatus(status) {
+    if (status === "signed") {
+      statusTag.textContent = "已签名";
+      statusTag.className = "status-tag status-signed";
+    } else if (status === "paid") {
+      statusTag.textContent = "已支付";
+      statusTag.className = "status-tag status-paid";
+    } else {
+      statusTag.textContent = "待签名";
+      statusTag.className = "status-tag status-pending";
+    }
+  }
+
+  async function loadOrder() {
+    if (!orderId) {
+      infoEl.textContent = "缺少订单ID";
+      return;
+    }
+    const { data, error } = await supabaseClient
+      .from("insurance_orders")
+      .select("*")
+      .eq("id", orderId)
+      .maybeSingle();
+    if (error || !data) {
+      infoEl.textContent = "未找到订单，请联系服务人员。";
+      console.error(error);
+      return;
+    }
+    orderData = data;
+    setStatus(data.status);
+    const text = 
+      "订单号：" + data.id + "\n" +
+      "车牌号：" + data.plate + "\n" +
+      "应付保费：" + (data.fee != null ? data.fee.toFixed(2) : "") + " 元\n" +
+      "保险期限：" + (data.period || "（见投保单）");
+    infoEl.textContent = text;
+
+    localStorage.setItem("orderId", data.id);
+    localStorage.setItem("plate", data.plate || "");
+    localStorage.setItem("fee", data.fee != null ? data.fee.toFixed(2) : "");
+    localStorage.setItem("period", data.period || "");
+  }
+
+  function bindCanvas() {
+    resizeCanvas();
+    let rect = pad.getBoundingClientRect();
+
+    function getPos(e) {
+      if (e.touches && e.touches[0]) {
+        return {
+          x: e.touches[0].clientX - rect.left,
+          y: e.touches[0].clientY - rect.top,
+        };
+      } else {
+        return {
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top,
+        };
+      }
+    }
+
+    function start(e) {
+      e.preventDefault();
+      drawing = true;
+      ctx.beginPath();
+      const pos = getPos(e);
+      ctx.moveTo(pos.x, pos.y);
+    }
+
+    function move(e) {
+      if (!drawing) return;
+      e.preventDefault();
+      const pos = getPos(e);
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
+    }
+
+    function end(e) {
+      e && e.preventDefault();
+      drawing = false;
+    }
+
+    pad.addEventListener("mousedown", start);
+    pad.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", end);
+
+    pad.addEventListener("touchstart", start, { passive: false });
+    pad.addEventListener("touchmove", move, { passive: false });
+    pad.addEventListener("touchend", end, { passive: false });
+    pad.addEventListener("touchcancel", end, { passive: false });
+
+    window.addEventListener("resize", () => {
+      rect = pad.getBoundingClientRect();
+      resizeCanvas();
+    });
+  }
+
+  function clearPad() {
+    ctx.clearRect(0, 0, pad.width, pad.height);
+  }
+
+  clearBtn.addEventListener("click", clearPad);
+
+  function canvasIsEmpty() {
+    const pixelBuffer = new Uint32Array(
+      ctx.getImageData(0, 0, pad.width, pad.height).data.buffer
+    );
+    return !pixelBuffer.some(color => color !== 0);
+  }
+
+  function getSignatureDataUrl() {
+    return pad.toDataURL("image/png");
+  }
+
+  function readFileAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function uploadSignature(dataUrl) {
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+    const ext = "png";
+    const path = `${orderId}/signature.${ext}`;
+    const { error } = await supabaseClient
+      .storage
+      .from("insure-signature")
+      .upload(path, blob, { upsert: true });
+    if (error) throw error;
+    const publicUrl = SUPABASE_URL + "/storage/v1/object/public/insure-signature/" + path;
+    return publicUrl;
+  }
+
+  confirmBtn.addEventListener("click", async () => {
+    if (!orderId) return;
+    confirmBtn.disabled = true;
+    try {
+      let dataUrl = null;
+      const file = signFileInput.files[0];
+      if (file) {
+        dataUrl = await readFileAsDataUrl(file);
+      } else if (!canvasIsEmpty()) {
+        dataUrl = getSignatureDataUrl();
+      } else {
+        alert("请先手写签名或上传签名照片。");
+        confirmBtn.disabled = false;
+        return;
+      }
+
+      const signatureUrl = await uploadSignature(dataUrl);
+
+      const { error } = await supabaseClient
+        .from("insurance_orders")
+        .update({
+          signature_url: signatureUrl,
+          status: "signed"
+        })
+        .eq("id", orderId);
+      if (error) {
+        alert("更新订单签名状态失败，请重试或联系服务人员。");
+        confirmBtn.disabled = false;
+        return;
+      }
+
+      window.location.href = "pay.html?id=" + encodeURIComponent(orderId);
+    } catch (e) {
+      console.error(e);
+      alert("签名上传失败，请重试或联系服务人员。");
+      confirmBtn.disabled = false;
+    }
+  });
+
+  loadOrder();
+  bindCanvas();
+</script>
+</body>
+</html>
