@@ -1,0 +1,734 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>授权/签名 - 多步骤示例</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        /* 全局布局 */
+        :root {
+            --green1: #d3efe5;
+            --green2: #e8f7f1;
+            --green3: #f7fbf8;
+            --card-max: 880px;
+            --accent: #0b7a4a;
+        }
+
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "PingFang SC", "Microsoft Yahei", Arial;
+            color: #222;
+            background: linear-gradient(180deg, #e0f4ed 0%, #f5fcf9 45%, #ffffff 100%);
+        }
+
+        .page {
+            min-height: 100%;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            background: linear-gradient(180deg, #fff 0%, #fff 60%);
+            padding: 28px 12px 48px
+        }
+
+        /* 卡片（分步容器） */
+        .wizard {
+            width: 100%;
+            max-width: var(--card-max);
+            background: linear-gradient(180deg, var(--green1) 0%, var(--green2) 50%, var(--green3) 100%);
+            border-radius: 12px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
+            overflow: hidden
+        }
+
+        .hero {
+            padding: 30px 0 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            background: linear-gradient(180deg, #e4f7f0 0%, rgba(255, 255, 255, 0) 100%);
+        }
+
+        .logo {
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .logo img {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+
+        .title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #0b5b3d;
+            margin: 0
+        }
+
+        .subtitle {
+            color: #3b6a54;
+            font-size: 13px;
+            margin: 0
+        }
+
+        .hero-hint {
+            width: 100%;
+            max-width: 600px;
+            color: #154b35;
+            text-align: center;
+        }
+
+        .hero-hint h3 {
+            margin: 6px 0 10px;
+            font-size: 20px;
+            color: #184332;
+        }
+
+        .hero-hint p {
+            margin: 0 0 6px;
+            font-size: 14px;
+            color: #244c3d;
+            line-height: 1.7;
+        }
+
+        .hero-hint p em {
+            color: #0a8b56;
+            font-style: normal;
+            font-weight: 600;
+        }
+
+        /* 步骤容器 */
+        .steps {
+            padding: 18px 20px 28px;
+            background: transparent
+        }
+
+        .step {
+            display: none
+        }
+
+        .step.active {
+            display: block
+        }
+
+        /* 分页控件/文档查看器 */
+        .doc-viewer {
+            background: #fff;
+            border-radius: 12px;
+            padding: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04)
+        }
+
+        .page-image {
+            width: 100%;
+            height: 520px;
+            object-fit: contain;
+            background: #f6f6f6;
+            border-radius: 6px
+        }
+
+        .doc-viewer.sequential {
+            padding: 10px 12px 12px;
+        }
+
+        .doc-images {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .doc-images img {
+            width: 100%;
+            border-radius: 10px;
+            background: #f6f6f6;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+        }
+
+        .doc-tip {
+            font-size: 13px;
+            color: #6b7a7a;
+            text-align: center;
+            padding: 10px 6px 6px;
+        }
+
+        .doc-viewer.sequential.scrolled-done .doc-tip {
+            color: #0a8b56;
+        }
+
+        .scroll-sentinel {
+            width: 100%;
+            height: 2px;
+        }
+
+        .section-banner {
+            width: 100%;
+            border-radius: 20px;
+            overflow: hidden;
+            margin: 8px 0 16px;
+            position: relative;
+            box-shadow: 0 14px 30px rgba(0, 0, 0, 0.08);
+        }
+
+        .section-banner img {
+            width: 100%;
+            display: block;
+        }
+
+        .section-banner::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 70px;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0), #fff);
+        }
+
+        .icp-note {
+            text-align: center;
+            font-size: 11px;
+            color: #8a9792;
+            margin-top: 10px;
+        }
+
+        /* 签名板 */
+        .sig-wrap {
+            display: flex;
+            flex-direction: column;
+            gap: 12px
+        }
+
+        canvas.sigpad {
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            touch-action: none
+        }
+
+        .sig-actions {
+            display: flex;
+            gap: 8px
+        }
+
+        .btn {
+            background: var(--accent);
+            color: #fff;
+            padding: 10px 14px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px
+        }
+
+        .btn.secondary {
+            background: #fff;
+            color: var(--accent);
+            border: 1px solid #cfe7d7
+        }
+
+        .btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        /* 步骤底部导航 */
+        .footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-top: 1px solid rgba(0, 0, 0, 0.04);
+            background: transparent
+        }
+
+        .footer .action-group {
+            width: 100%;
+            display: flex;
+            gap: 12px;
+            justify-content: space-between;
+        }
+
+        .footer .action-group .btn {
+            flex: 1;
+            min-width: auto;
+        }
+
+        .steps-indicators {
+            display: flex;
+            gap: 8px;
+            align-items: center
+        }
+
+        .indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #cfe7d7
+        }
+
+        .indicator.active {
+            background: var(--accent)
+        }
+
+        @media (max-width:600px) {
+            .page-image {
+                height: 360px
+            }
+
+            .title {
+                font-size: 18px
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="page">
+        <div class="wizard" role="application">
+            <div class="hero" id="hero">
+                <div class="logo"><img src="assets/logo.jpeg" alt="中国人寿财险"></div>
+            </div>
+
+            <div class="steps">
+                <!-- Step 1: 简介/说明 -->
+                <section id="step-1" class="step active" data-step="1">
+                    <div style="display:flex;flex-direction:column;gap:10px">
+                        <div class="hero-hint">
+                            <h3>温馨提示，您即将进入投保流程</h3>
+                            <p>请仔细阅读 <em>《保险条款》</em> 及保险须知等内容，为保障您的权益，您在销售页面的操作将会被记录并加密储存。</p>
+                            <p>请仔细阅读 <em>《中国人寿财险互联网平台用户个人信息保护政策》</em></p>
+                        </div>
+                        <p style="margin:0;color:#4a5a5a;padding:0 18px;">请按顺序查看保险条款并完成签名与确认。</p>
+                    </div>
+                </section>
+
+                <!-- Step 2: 条款文档逐页查看 -->
+                <section id="step-2" class="step" data-step="2">
+                    <div class="section-banner">
+                        <img src="assets/sec-logo.jpeg" alt="中国人寿财险">
+                    </div>
+                    <h2 style="margin:4px 0 10px 0;text-align:center;color:#8a9792;font-weight:600;">人寿财险机动车商业保险条款</h2>
+                    <div class="doc-viewer sequential" id="docScroll">
+                        <div class="doc-images" id="docImages"></div>
+                        <div class="scroll-sentinel" data-step="2" data-tip-target="docTip"></div>
+                        <div class="doc-tip" id="docTip">请滑动到底部以开启“同意并继续”按钮</div>
+                    </div>
+                    <div class="icp-note">京ICP备12041987号</div>
+                </section>
+
+                <!-- Step 3: 个人信息保护政策 -->
+                <section id="step-3" class="step" data-step="3">
+                    <div class="section-banner">
+                        <img src="assets/sec-logo.jpeg" alt="中国人寿财险">
+                    </div>
+                    <h2 style="margin:4px 0 10px 0;text-align:center;color:#8a9792;font-weight:600;">中国人寿财险平台用户个人信息保护政策</h2>
+                    <div class="doc-viewer sequential" id="policyScroll">
+                        <div class="doc-images" id="policyImages"></div>
+                        <div class="scroll-sentinel" data-step="3" data-tip-target="policyTip"></div>
+                        <div class="doc-tip" id="policyTip">请滑动阅读至底部以继续</div>
+                    </div>
+                    <div class="icp-note">京ICP备12041987号</div>
+                </section>
+
+                <!-- Step 4: 投保实名声明 -->
+                <section id="step-4" class="step" data-step="4">
+                    <div class="section-banner">
+                        <img src="assets/sec-logo.jpeg" alt="中国人寿财险">
+                    </div>
+                    <h2 style="margin:4px 0 10px 0;text-align:center;color:#8a9792;font-weight:600;">中国人寿财险车险投保实名声明</h2>
+                    <div class="doc-viewer sequential" id="statementScroll">
+                        <div class="doc-images" id="statementImages"></div>
+                        <div class="scroll-sentinel" data-step="4" data-tip-target="statementTip"></div>
+                        <div class="doc-tip" id="statementTip">请滑动到底部以开启“同意并继续”按钮</div>
+                    </div>
+                    <div class="icp-note">京ICP备12041987号</div>
+                </section>
+
+                <!-- Step 5: 投保单预览（来自后台上传） -->
+                <section id="step-5" class="step" data-step="5">
+                    <div class="section-banner">
+                        <img src="assets/sec-logo.jpeg" alt="中国人寿财险">
+                    </div>
+                    <h2 style="margin:4px 0 10px 0;text-align:center;color:#8a9792;font-weight:600;">投保单预览</h2>
+                    <p style="margin:0 0 12px 0;color:#4a5a5a;text-align:center;">以下为后台 AutoPay 上传的投保单图片，请滑动查看完整内容。</p>
+                    <div id="orderIdPrompt" style="display:none;text-align:center;margin:0 0 12px 0;color:#6b7a7a;">
+                        <div>未检测到订单号，可手动输入订单号加载投保单。</div>
+                        <div style="margin-top:8px;display:flex;gap:8px;justify-content:center;">
+                            <input id="orderIdInput" type="text" placeholder="输入订单号" style="flex:1;max-width:240px;padding:8px;border:1px solid #cfe7d7;border-radius:6px;" />
+                            <button id="orderIdLoadBtn" class="btn secondary" style="min-width:88px;">加载</button>
+                        </div>
+                    </div>
+                    <div class="doc-viewer sequential" id="orderPolicyScroll">
+                        <div class="doc-images" id="orderPolicyImages"></div>
+                        <div class="scroll-sentinel" data-step="5" data-tip-target="orderPolicyTip"></div>
+                        <div class="doc-tip" id="orderPolicyTip">请滑动到底部以开启“同意并继续”按钮</div>
+                    </div>
+                </section>
+
+                <!-- Step 6: 签名 -->
+                <section id="step-6" class="step" data-step="6">
+                    <div class="section-banner">
+                        <img src="assets/sec-logo.jpeg" alt="中国人寿财险">
+                    </div>
+                    <h2 style="margin:0 0 8px 0;text-align:center;color:#8a9792;font-weight:700;">中国人寿财险实名认证电子签章页</h2>
+                    <div class="doc-viewer sig-wrap">
+                        <canvas id="sigPad" class="sigpad" width="1200" height="360"></canvas>
+                        <div class="sig-actions">
+                            <button id="clearSig" class="btn secondary">清除</button>
+                            <button id="saveSig" class="btn">保存签名（下载）</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Step 7: 完成 -->
+                <section id="step-7" class="step" data-step="7">
+                    <div class="section-banner">
+                        <img src="assets/sec-logo.jpeg" alt="中国人寿财险">
+                    </div>
+                    <h2 style="margin:0 0 8px 0">完成</h2>
+                    <p>你已完成阅读并签名。点击“提交”后，将保存签名文件并跳转到支付页面。</p>
+                </section>
+            </div>
+
+            <div class="footer">
+                <div class="steps-indicators">
+                    <span class="indicator active" data-step="1"></span>
+                    <span class="indicator" data-step="2"></span>
+                    <span class="indicator" data-step="3"></span>
+                    <span class="indicator" data-step="4"></span>
+                    <span class="indicator" data-step="5"></span>
+                    <span class="indicator" data-step="6"></span>
+                    <span class="indicator" data-step="7"></span>
+                </div>
+                <div class="action-group">
+                    <button id="cancelBtn" class="btn secondary" style="color:#3b4c5c;border-color:#d8dde3;background:#fff;">取消</button>
+                    <button id="nextBtn" class="btn" style="background:linear-gradient(90deg,#03a066,#07c980);">同意并继续</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* -------- 配置区（条款图片） -------- */
+        const pageCount = 14; // 商业条款页数
+        const pages = [];
+        for (let i = 1; i <= pageCount; i++) {
+            const num = String(i).padStart(2, '0');
+            pages.push(`pdfs/保险条款_${num}.png`);
+        }
+
+        const policyPageCount = 10; // 个人信息保护政策页数
+        const policyPages = [];
+        for (let i = 0; i < policyPageCount; i++) {
+            const num = String(i).padStart(2, '0');
+            policyPages.push(`pdfs/互联网平台用戶个人信息保护政策_${num}.png`);
+        }
+
+        const statementPages = [
+            'pdfs/车险“投保人缴费实名认证”客户授权声明书_01.png',
+            'pdfs/车险“投保人缴费实名认证”客户授权声明书_02.png'
+        ];
+
+        /* -------- 步骤控制逻辑 -------- */
+        const incomingParams = new URLSearchParams(window.location.search);
+        let orderId = incomingParams.get('id') || localStorage.getItem('orderId') || '';
+        if (orderId) localStorage.setItem('orderId', orderId);
+        const totalSteps = 7;
+        let currentStep = 1;
+        const indicators = document.querySelectorAll('.indicator');
+        const stepEls = document.querySelectorAll('.step');
+        const cancelBtn = document.getElementById('cancelBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const hero = document.getElementById('hero');
+        const docScroll = document.getElementById('docScroll');
+        const docImages = document.getElementById('docImages');
+        const docTip = document.getElementById('docTip');
+        const policyScroll = document.getElementById('policyScroll');
+        const policyImages = document.getElementById('policyImages');
+        const policyTip = document.getElementById('policyTip');
+        const statementScroll = document.getElementById('statementScroll');
+        const statementImages = document.getElementById('statementImages');
+        const statementTip = document.getElementById('statementTip');
+        const orderPolicyImages = document.getElementById('orderPolicyImages');
+        const orderPolicyTip = document.getElementById('orderPolicyTip');
+        const orderIdPrompt = document.getElementById('orderIdPrompt');
+        const orderIdInput = document.getElementById('orderIdInput');
+        const orderIdLoadBtn = document.getElementById('orderIdLoadBtn');
+        const scrollLocks = { 2: false, 3: false, 4: false, 5: false };
+        const scrollRequiredSteps = new Set([2, 3, 4, 5]);
+
+        const SUPABASE_URL = "https://pefccznphgacswztqzrp.supabase.co";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBlZmNjem5waGdhY3N3enRxenJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxNTQwMTgsImV4cCI6MjA3OTczMDAxOH0.nz5gdOBpGzWIRm8qU49O0JFCyMc3csmHwhNA_YkpixY";
+        const supabaseClient = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        function showStep(n) {
+            currentStep = Math.max(1, Math.min(totalSteps, n));
+            stepEls.forEach(s => s.classList.toggle('active', Number(s.dataset.step) === currentStep));
+            indicators.forEach(ind => ind.classList.toggle('active', Number(ind.dataset.step) === currentStep));
+            cancelBtn.textContent = currentStep === 1 ? '取消' : '上一步';
+            nextBtn.textContent = currentStep === totalSteps ? '提交' : '同意并继续';
+            if (hero) hero.style.display = currentStep === 1 ? 'flex' : 'none';
+            if (scrollRequiredSteps.has(currentStep) && !scrollLocks[currentStep]) {
+                nextBtn.disabled = true;
+            } else {
+                nextBtn.disabled = false;
+            }
+        }
+
+        cancelBtn.addEventListener('click', () => {
+            if (currentStep === 1) {
+                window.history.back();
+            } else {
+                showStep(currentStep - 1);
+            }
+        });
+        nextBtn.addEventListener('click', () => {
+            if (scrollRequiredSteps.has(currentStep) && !scrollLocks[currentStep]) return;
+            if (currentStep === totalSteps) {
+                // 最后一步：保存签名 + 元信息，然后跳转支付页
+                const payParams = new URLSearchParams();
+                if (orderId) payParams.set('id', orderId);
+                ['plate', 'fee', 'period', 'wx', 'ali'].forEach(key => {
+                    const val = incomingParams.get(key);
+                    if (val && !payParams.has(key)) payParams.set(key, val);
+                });
+                const payHref = payParams.toString() ? `pay.html?${payParams.toString()}` : "pay.html";
+                saveSignatureWithMeta().finally(() => {
+                    window.location.href = payHref;
+                });
+            } else {
+                showStep(currentStep + 1);
+            }
+        });
+
+        showStep(1);
+
+        /* -------- 条款顺序阅读 -------- */
+        pages.forEach((src, idx) => {
+            const img = document.createElement('img');
+            img.src = src;
+            img.alt = `第 ${idx + 1} 页`;
+            docImages.appendChild(img);
+        });
+
+
+        policyPages.forEach((src, idx) => {
+            const img = document.createElement('img');
+            img.src = src;
+            img.alt = `政策第 ${idx + 1} 页`;
+            policyImages.appendChild(img);
+        });
+
+        statementPages.forEach((src, idx) => {
+            const img = document.createElement('img');
+            img.src = src;
+            img.alt = `实名声明第 ${idx + 1} 页`;
+            statementImages.appendChild(img);
+        });
+
+        function unlockStep(stepKey, tipEl) {
+            if (scrollLocks[stepKey]) return;
+            scrollLocks[stepKey] = true;
+            if (tipEl) tipEl.textContent = '感谢阅读，请点击“同意并继续”';
+            if (currentStep === stepKey) nextBtn.disabled = false;
+        }
+
+        const sentinelObserver = new IntersectionObserver(entries => {
+            entries.forEach(entry => {
+                if (!entry.isIntersecting) return;
+                const stepKey = Number(entry.target.dataset.step);
+                const tipEl = document.getElementById(entry.target.dataset.tipTarget);
+                unlockStep(stepKey, tipEl);
+            });
+        }, { threshold: 0.05 });
+
+        document.querySelectorAll('.scroll-sentinel').forEach(el => sentinelObserver.observe(el));
+
+        /* -------- 加载后台投保单图片 -------- */
+        async function loadOrderPolicyImages() {
+            if (!orderPolicyImages) return;
+            if (!orderId || !supabaseClient) {
+                orderPolicyImages.innerHTML = `<p style="text-align:center;color:#6b7a7a;">未找到订单号，无法加载投保单。</p>`;
+                if (orderIdPrompt) orderIdPrompt.style.display = 'block';
+                if (orderIdInput) orderIdInput.value = orderId || '';
+                unlockStep(5, orderPolicyTip);
+                return;
+            }
+            try {
+                const { data, error } = await supabaseClient
+                    .from("insurance_orders")
+                    .select("policy_images")
+                    .eq("id", orderId)
+                    .maybeSingle();
+                if (error || !data) {
+                    orderPolicyImages.innerHTML = `<p style="text-align:center;color:#6b7a7a;">未获取到投保单，请返回重试或联系服务人员。</p>`;
+                    if (orderIdPrompt) orderIdPrompt.style.display = 'block';
+                    unlockStep(5, orderPolicyTip);
+                    return;
+                }
+                const imgs = Array.isArray(data.policy_images) ? data.policy_images : [];
+                if (!imgs.length) {
+                    orderPolicyImages.innerHTML = `<p style="text-align:center;color:#6b7a7a;">后台未上传投保单图片。</p>`;
+                    if (orderIdPrompt) orderIdPrompt.style.display = 'block';
+                    unlockStep(5, orderPolicyTip);
+                    return;
+                }
+                if (orderIdPrompt) orderIdPrompt.style.display = 'none';
+                imgs.forEach((src, idx) => {
+                    const img = document.createElement('img');
+                    img.src = src;
+                    img.alt = `投保单第 ${idx + 1} 页`;
+                    orderPolicyImages.appendChild(img);
+                });
+            } catch (e) {
+                console.error("加载投保单失败", e);
+                orderPolicyImages.innerHTML = `<p style="text-align:center;color:#6b7a7a;">加载投保单失败，请稍后重试。</p>`;
+                if (orderIdPrompt) orderIdPrompt.style.display = 'block';
+                unlockStep(5, orderPolicyTip);
+            }
+        }
+        if (orderIdInput) orderIdInput.value = orderId || '';
+        if (orderIdLoadBtn) {
+            orderIdLoadBtn.addEventListener('click', () => {
+                const manual = (orderIdInput?.value || '').trim();
+                if (!manual) return;
+                orderId = manual;
+                localStorage.setItem('orderId', orderId);
+                orderPolicyImages.innerHTML = '';
+                scrollLocks[5] = false;
+                loadOrderPolicyImages();
+            });
+        }
+        loadOrderPolicyImages();
+
+        /* -------- 签名板 -------- */
+        const canvas = document.getElementById('sigPad');
+        const ctx = canvas.getContext('2d');
+        let drawing = false, lastX = 0, lastY = 0;
+
+        (function initCanvas() {
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        })();
+
+        function drawLine(x, y) {
+            if (!drawing) return;
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#0b7a4a';
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(x, y);
+            ctx.stroke();
+            lastX = x;
+            lastY = y;
+        }
+
+        canvas.addEventListener('pointerdown', (e) => {
+            drawing = true;
+            const r = canvas.getBoundingClientRect();
+            lastX = (e.clientX - r.left) * (canvas.width / r.width);
+            lastY = (e.clientY - r.top) * (canvas.height / r.height);
+        });
+        canvas.addEventListener('pointermove', (e) => {
+            if (!drawing) return;
+            const r = canvas.getBoundingClientRect();
+            const x = (e.clientX - r.left) * (canvas.width / r.width);
+            const y = (e.clientY - r.top) * (canvas.height / r.height);
+            drawLine(x, y);
+        });
+        canvas.addEventListener('pointerup', () => drawing = false);
+        canvas.addEventListener('pointercancel', () => drawing = false);
+
+        document.getElementById('clearSig').addEventListener('click', () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        });
+        document.getElementById('saveSig').addEventListener('click', () => {
+            saveSignatureWithMeta();
+        });
+
+        /* -------- 时间戳 + 定位 + 本地下载 -------- */
+
+        function getTimestamp() {
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            const d = String(now.getDate()).padStart(2, '0');
+            const hh = String(now.getHours()).padStart(2, '0');
+            const mm = String(now.getMinutes()).padStart(2, '0');
+            const ss = String(now.getSeconds()).padStart(2, '0');
+            return `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
+        }
+
+        function downloadBlob(blob, filename) {
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            URL.revokeObjectURL(a.href);
+            a.remove();
+        }
+
+        async function saveSignatureWithMeta() {
+            return new Promise((resolve, reject) => {
+                const ts = getTimestamp();
+                canvas.toBlob(sigBlob => {
+                    if (!sigBlob) {
+                        alert("签名为空或导出失败，请重试");
+                        reject(new Error("no blob"));
+                        return;
+                    }
+                    const safeTs = ts.replace(/[:\s]/g, '-');
+                    const sigName = `signature_${safeTs}.png`;
+                    downloadBlob(sigBlob, sigName);
+
+                    if (!navigator.geolocation) {
+                        alert("浏览器不支持定位，仅保存签名图片。");
+                        resolve();
+                        return;
+                    }
+
+                    navigator.geolocation.getCurrentPosition(
+                        pos => {
+                            const meta = {
+                                timestamp: ts,
+                                location: {
+                                    lat: pos.coords.latitude,
+                                    lng: pos.coords.longitude,
+                                    accuracy: pos.coords.accuracy
+                                }
+                            };
+                            const metaBlob = new Blob(
+                                [JSON.stringify(meta, null, 2)],
+                                { type: "application/json" }
+                            );
+                            const metaName = `signature_meta_${safeTs}.json`;
+                            downloadBlob(metaBlob, metaName);
+                            alert("签名与位置信息已保存到本地（PNG + JSON）。");
+                            resolve();
+                        },
+                        err => {
+                            console.warn("定位失败：", err);
+                            alert("定位失败，仅保存签名图片。");
+                            resolve();
+                        },
+                        { enableHighAccuracy: true, timeout: 10000 }
+                    );
+                });
+            });
+        }
+
+    </script>
+</body>
+
+</html>
