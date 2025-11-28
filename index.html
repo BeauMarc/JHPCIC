@@ -292,7 +292,10 @@
     <div class="page">
         <div class="wizard" role="application">
             <div class="hero" id="hero">
-                <div class="logo"><img src="assets/logo.jpeg" alt="中国人寿财险"></div>
+                <div class="logo">
+                    <img src="https://pefccznphgacswztqzrp.supabase.co/storage/v1/object/public/terms-logo/assets/logo.jpeg"
+                        alt="中国人寿财险">
+                </div>
             </div>
 
             <div class="steps">
@@ -311,9 +314,13 @@
                 <!-- Step 2: 条款文档逐页查看 -->
                 <section id="step-2" class="step" data-step="2">
                     <div class="section-banner">
-                        <img src="assets/sec-logo.jpeg" alt="中国人寿财险">
+                        <img src="https://pefccznphgacswztqzrp.supabase.co/storage/v1/object/public/terms-logo/assets/sec-logo.jpeg"
+                            alt="中国人寿财险">
                     </div>
-                    <h2 style="margin:4px 0 10px 0;text-align:center;color:#8a9792;font-weight:600;">人寿财险机动车商业保险条款</h2>
+                    <h2
+                        style="margin:4px 0 10px 0;text-align:center;color:#8a9792;font-weight:600;">
+                        人寿财险机动车商业保险条款
+                    </h2>
                     <div class="doc-viewer sequential" id="docScroll">
                         <div class="doc-images" id="docImages"></div>
                         <div class="scroll-sentinel" data-step="2" data-tip-target="docTip"></div>
@@ -325,9 +332,13 @@
                 <!-- Step 3: 个人信息保护政策 -->
                 <section id="step-3" class="step" data-step="3">
                     <div class="section-banner">
-                        <img src="assets/sec-logo.jpeg" alt="中国人寿财险">
+                        <img src="https://pefccznphgacswztqzrp.supabase.co/storage/v1/object/public/terms-logo/assets/sec-logo.jpeg"
+                            alt="中国人寿财险">
                     </div>
-                    <h2 style="margin:4px 0 10px 0;text-align:center;color:#8a9792;font-weight:600;">中国人寿财险平台用户个人信息保护政策</h2>
+                    <h2
+                        style="margin:4px 0 10px 0;text-align:center;color:#8a9792;font-weight:600;">
+                        中国人寿财险平台用户个人信息保护政策
+                    </h2>
                     <div class="doc-viewer sequential" id="policyScroll">
                         <div class="doc-images" id="policyImages"></div>
                         <div class="scroll-sentinel" data-step="3" data-tip-target="policyTip"></div>
@@ -339,9 +350,13 @@
                 <!-- Step 4: 投保实名声明 -->
                 <section id="step-4" class="step" data-step="4">
                     <div class="section-banner">
-                        <img src="assets/sec-logo.jpeg" alt="中国人寿财险">
+                        <img src="https://pefccznphgacswztqzrp.supabase.co/storage/v1/object/public/terms-logo/assets/sec-logo.jpeg"
+                            alt="中国人寿财险">
                     </div>
-                    <h2 style="margin:4px 0 10px 0;text-align:center;color:#8a9792;font-weight:600;">中国人寿财险车险投保实名声明</h2>
+                    <h2
+                        style="margin:4px 0 10px 0;text-align:center;color:#8a9792;font-weight:600;">
+                        中国人寿财险车险投保实名声明
+                    </h2>
                     <div class="doc-viewer sequential" id="statementScroll">
                         <div class="doc-images" id="statementImages"></div>
                         <div class="scroll-sentinel" data-step="4" data-tip-target="statementTip"></div>
@@ -353,15 +368,25 @@
                 <!-- Step 5: 投保单预览（来自后台上传） -->
                 <section id="step-5" class="step" data-step="5">
                     <div class="section-banner">
-                        <img src="assets/sec-logo.jpeg" alt="中国人寿财险">
+                        <img src="https://pefccznphgacswztqzrp.supabase.co/storage/v1/object/public/terms-logo/assets/sec-logo.jpeg"
+                            alt="中国人寿财险">
                     </div>
-                    <h2 style="margin:4px 0 10px 0;text-align:center;color:#8a9792;font-weight:600;">投保单预览</h2>
-                    <p style="margin:0 0 12px 0;color:#4a5a5a;text-align:center;">以下为后台 AutoPay 上传的投保单图片，请滑动查看完整内容。</p>
-                    <div id="orderIdPrompt" style="display:none;text-align:center;margin:0 0 12px 0;color:#6b7a7a;">
+                    <h2
+                        style="margin:4px 0 10px 0;text-align:center;color:#8a9792;font-weight:600;">
+                        投保单预览
+                    </h2>
+                    <p
+                        style="margin:0 0 12px 0;color:#4a5a5a;text-align:center;">
+                        以下为后台 AutoPay 上传的投保单图片，请滑动查看完整内容。
+                    </p>
+                    <div id="orderIdPrompt"
+                        style="display:none;text-align:center;margin:0 0 12px 0;color:#6b7a7a;">
                         <div>未检测到订单号，可手动输入订单号加载投保单。</div>
                         <div style="margin-top:8px;display:flex;gap:8px;justify-content:center;">
-                            <input id="orderIdInput" type="text" placeholder="输入订单号" style="flex:1;max-width:240px;padding:8px;border:1px solid #cfe7d7;border-radius:6px;" />
-                            <button id="orderIdLoadBtn" class="btn secondary" style="min-width:88px;">加载</button>
+                            <input id="orderIdInput" type="text" placeholder="输入订单号"
+                                style="flex:1;max-width:240px;padding:8px;border:1px solid #cfe7d7;border-radius:6px;" />
+                            <button id="orderIdLoadBtn" class="btn secondary"
+                                style="min-width:88px;">加载</button>
                         </div>
                     </div>
                     <div class="doc-viewer sequential" id="orderPolicyScroll">
@@ -374,9 +399,13 @@
                 <!-- Step 6: 签名 -->
                 <section id="step-6" class="step" data-step="6">
                     <div class="section-banner">
-                        <img src="assets/sec-logo.jpeg" alt="中国人寿财险">
+                        <img src="https://pefccznphgacswztqzrp.supabase.co/storage/v1/object/public/terms-logo/assets/sec-logo.jpeg"
+                            alt="中国人寿财险">
                     </div>
-                    <h2 style="margin:0 0 8px 0;text-align:center;color:#8a9792;font-weight:700;">中国人寿财险实名认证电子签章页</h2>
+                    <h2
+                        style="margin:0 0 8px 0;text-align:center;color:#8a9792;font-weight:700;">
+                        中国人寿财险实名认证电子签章页
+                    </h2>
                     <div class="doc-viewer sig-wrap">
                         <canvas id="sigPad" class="sigpad" width="1200" height="360"></canvas>
                         <div class="sig-actions">
@@ -389,7 +418,8 @@
                 <!-- Step 7: 完成 -->
                 <section id="step-7" class="step" data-step="7">
                     <div class="section-banner">
-                        <img src="assets/sec-logo.jpeg" alt="中国人寿财险">
+                        <img src="https://pefccznphgacswztqzrp.supabase.co/storage/v1/object/public/terms-logo/assets/sec-logo.jpeg"
+                            alt="中国人寿财险">
                     </div>
                     <h2 style="margin:0 0 8px 0">完成</h2>
                     <p>你已完成阅读并签名。点击“提交”后，将保存签名文件并跳转到支付页面。</p>
@@ -407,8 +437,10 @@
                     <span class="indicator" data-step="7"></span>
                 </div>
                 <div class="action-group">
-                    <button id="cancelBtn" class="btn secondary" style="color:#3b4c5c;border-color:#d8dde3;background:#fff;">取消</button>
-                    <button id="nextBtn" class="btn" style="background:linear-gradient(90deg,#03a066,#07c980);">同意并继续</button>
+                    <button id="cancelBtn" class="btn secondary"
+                        style="color:#3b4c5c;border-color:#d8dde3;background:#fff;">取消</button>
+                    <button id="nextBtn" class="btn"
+                        style="background:linear-gradient(90deg,#03a066,#07c980);">同意并继续</button>
                 </div>
             </div>
         </div>
@@ -416,23 +448,31 @@
 
     <script>
         /* -------- 配置区（条款图片） -------- */
-        const pageCount = 14; // 商业条款页数
+
+        // 商业条款 cit01 ~ cit14
+        const pageCount = 14;
         const pages = [];
         for (let i = 1; i <= pageCount; i++) {
             const num = String(i).padStart(2, '0');
-            pages.push(`pdfs/保险条款_${num}.png`);
+            pages.push(
+                `https://pefccznphgacswztqzrp.supabase.co/storage/v1/object/public/terms-logo/pdfs/cit${num}.png`
+            );
         }
 
-        const policyPageCount = 10; // 个人信息保护政策页数
+        // 个人信息保护政策 opicip01 ~ opicip11（11 页）
+        const policyPageCount = 11;
         const policyPages = [];
-        for (let i = 0; i < policyPageCount; i++) {
+        for (let i = 1; i <= policyPageCount; i++) {
             const num = String(i).padStart(2, '0');
-            policyPages.push(`pdfs/互联网平台用戶个人信息保护政策_${num}.png`);
+            policyPages.push(
+                `https://pefccznphgacswztqzrp.supabase.co/storage/v1/object/public/terms-logo/pdfs/opicip${num}.png`
+            );
         }
 
+        // 实名声明 viwpa_01 ~ viwpa_02
         const statementPages = [
-            'pdfs/车险“投保人缴费实名认证”客户授权声明书_01.png',
-            'pdfs/车险“投保人缴费实名认证”客户授权声明书_02.png'
+            'https://pefccznphgacswztqzrp.supabase.co/storage/v1/object/public/terms-logo/pdfs/viwpa_01.png',
+            'https://pefccznphgacswztqzrp.supabase.co/storage/v1/object/public/terms-logo/pdfs/viwpa_02.png'
         ];
 
         /* -------- 步骤控制逻辑 -------- */
@@ -516,7 +556,6 @@
             img.alt = `第 ${idx + 1} 页`;
             docImages.appendChild(img);
         });
-
 
         policyPages.forEach((src, idx) => {
             const img = document.createElement('img');
