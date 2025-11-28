@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>保费支付</title>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft Yahei", Arial;
+    background: #f5f6f8;
+    color: #222;
+  }
+  .page {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .header {
+    padding: 18px 16px 10px;
+    background: #0b7a4a;
+    color: #fff;
+  }
+  .header-title {
+    font-size: 18px;
+    font-weight: 600;
+  }
+  .header-sub {
+    font-size: 13px;
+    opacity: 0.9;
+    margin-top: 4px;
+  }
+  .content {
+    flex: 1;
+    padding: 16px;
+  }
+  .card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 14px 16px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+    margin-bottom: 12px;
+  }
+  .label {
+    font-size: 13px;
+    color: #777;
+  }
+  .value {
+    font-size: 16px;
+    font-weight: 600;
+    margin-top: 2px;
+    margin-bottom: 6px;
+  }
+  .tabs {
+    display: flex;
+    background: #e7f3ed;
+    border-radius: 999px;
+    padding: 3px;
+    margin-bottom: 12px;
+  }
+  .tab {
+    flex: 1;
+    text-align: center;
+    font-size: 14px;
+    padding: 8px 0;
+    border-radius: 999px;
+    cursor: pointer;
+    color: #0b5b3d;
+  }
+  .tab.active {
+    background: #fff;
+    font-weight: 600;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+  }
+  .qr-wrap {
+    text-align: center;
+    margin-top: 8px;
+  }
+  .qr-wrap img {
+    width: 220px;
+    height: 220px;
+    object-fit: contain;
+    background: #fff;
+    padding: 10px;
+    border-radius: 16px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  }
+  .tip {
+    font-size: 12px;
+    color: #666;
+    margin-top: 8px;
+  }
+  .footer {
+    padding: 10px 16px 18px;
+    background: #fff;
+    box-shadow: 0 -4px 12px rgba(0,0,0,0.06);
+  }
+  .btn-main {
+    width: 100%;
+    border: none;
+    border-radius: 28px;
+    padding: 12px 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: #fff;
+    background: linear-gradient(90deg, #00A56C, #05C390);
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <div class="header-title">保费支付</div>
+    <div class="header-sub" id="headerSub">请确认车辆信息后选择支付方式</div>
+  </div>
+
+  <div class="content">
+    <div class="card">
+      <div class="label">投保车辆</div>
+      <div class="value" id="plateText">-</div>
+
+      <div class="label">应付保费</div>
+      <div class="value" id="feeText">- 元</div>
+
+      <div class="label">保险期限</div>
+      <div class="value" id="periodText">-</div>
+    </div>
+
+    <div class="card">
+      <div class="label" style="margin-bottom:6px">请选择支付方式</div>
+      <div class="tabs">
+        <div class="tab active" data-tab="wechat" id="tabWeChat">微信支付</div>
+        <div class="tab" data-tab="alipay" id="tabAlipay">支付宝支付</div>
+      </div>
+
+      <div id="wechatBox" class="qr-wrap" style="display:none">
+        <img id="wechatQr" src="" alt="微信支付二维码">
+        <div class="tip" id="wechatTip">请使用微信“扫一扫”对准二维码完成支付。</div>
+      </div>
+
+      <div id="alipayBox" class="qr-wrap" style="display:none">
+        <div id="alipayQr"></div>
+        <div class="tip">请使用支付宝“扫一扫”对准二维码完成支付。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <button class="btn-main" id="payBtn">打开支付应用说明</button>
+  </div>
+</div>
+
+<script>
+  const SUPABASE_URL = "https://pefccznphgacswztqzrp.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBlZmNjem5waGdhY3N3enRxenJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxNTQwMTgsImV4cCI6MjA3OTczMDAxOH0.nz5gdOBpGzWIRm8qU49O0JFCyMc3csmHwhNA_YkpixY";
+  const supabaseClient = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const params = new URLSearchParams(window.location.search);
+  const orderId = params.get("id") || localStorage.getItem("orderId") || "";
+  const wxParam = params.get("wx");
+  const aliParam = params.get("ali");
+  const fallbackPlate = params.get("plate") || localStorage.getItem("plate") || "";
+  const fallbackFee = params.get("fee") || localStorage.getItem("fee") || "";
+  const fallbackPeriod = params.get("period") || localStorage.getItem("period") || "";
+  const defaultAliUrl = 'https://userpay.huilaitongpay.com/api/anon/toMchInfoPay?mchNo=H1758191438&userId=100345&orderSubject=%E4%B8%AD%E5%9B%BD%E4%BA%BA%E5%AF%BF%E8%B4%A2%E9%99%A9%E6%96%B0%E8%83%BD%E6%BA%90%E6%B1%BD%E8%BD%A6%E5%95%86%E4%B8%9A%E4%BF%9D%E9%99%A9&isAliLite=false';
+
+  const plateTextEl = document.getElementById("plateText");
+  const feeTextEl = document.getElementById("feeText");
+  const periodTextEl = document.getElementById("periodText");
+  const headerSub = document.getElementById("headerSub");
+  const aliContainer = document.getElementById("alipayQr");
+  const wechatQrImg = document.getElementById("wechatQr");
+  const wechatBox = document.getElementById("wechatBox");
+  const wechatTip = document.getElementById("wechatTip");
+
+  const tabWeChat = document.getElementById("tabWeChat");
+  const tabAlipay = document.getElementById("tabAlipay");
+  const alipayBox = document.getElementById("alipayBox");
+
+  let currentMethod = "wechat";
+
+  function parseFeeToNumber(val) {
+    if (val === null || val === undefined || val === "") return NaN;
+    const num = Number(val);
+    return Number.isFinite(num) ? num : NaN;
+  }
+
+  function renderOrder(data) {
+    const plate = data.plate || fallbackPlate;
+    const feeNumber = data.fee != null ? parseFeeToNumber(data.fee) : parseFeeToNumber(fallbackFee);
+    const period = data.period || fallbackPeriod;
+
+    plateTextEl.textContent = plate || "（未传入车牌号）";
+    feeTextEl.textContent = Number.isFinite(feeNumber) ? (feeNumber.toFixed(2) + " 元") : "（未传入金额）";
+    periodTextEl.textContent = period || "（未传入保险期限）";
+
+    const headerParts = [];
+    if (orderId) headerParts.push("订单 " + orderId);
+    if (plate) headerParts.push("车辆 " + plate);
+    if (Number.isFinite(feeNumber)) headerParts.push("应付保费 " + feeNumber.toFixed(2) + " 元");
+    if (headerParts.length) {
+      headerSub.textContent = headerParts.join("，");
+    }
+
+    // 支付宝二维码
+    const aliUrl = data.alipay_qr_url
+      || (aliParam ? decodeURIComponent(aliParam) : "")
+      || defaultAliUrl;
+    alipayBox.style.display = "block";
+    aliContainer.innerHTML = "";
+    if (aliUrl) {
+      new QRCode(aliContainer, { text: aliUrl, width: 220, height: 220 });
+    } else {
+      aliContainer.innerHTML = "<p class='tip'>未提供支付宝支付链接，请联系服务人员。</p>";
+    }
+
+    // 微信二维码（若后台未上传则隐藏 tab）
+    const wechatUrl = data.wechat_qr_url || (wxParam ? decodeURIComponent(wxParam) : "");
+    const hasWechat = !!wechatUrl;
+    tabWeChat.style.display = hasWechat ? "block" : "none";
+    if (hasWechat) {
+      wechatQrImg.src = wechatUrl;
+      wechatTip.textContent = "请使用微信“扫一扫”对准二维码完成支付。";
+      wechatBox.style.display = "block";
+    } else {
+      wechatBox.style.display = "none";
+    }
+
+    // 如果当前选项是微信但微信码不存在，切换回支付宝
+    const targetTab = (!hasWechat && currentMethod === "wechat") ? "alipay" : currentMethod;
+    setTab(targetTab);
+  }
+
+  async function loadOrder() {
+    if (orderId && supabaseClient) {
+      try {
+        const { data, error } = await supabaseClient
+          .from("insurance_orders")
+          .select("*")
+          .eq("id", orderId)
+          .maybeSingle();
+        if (data) {
+          renderOrder(data);
+          return;
+        }
+        if (error) {
+          console.warn("加载订单失败: ", error);
+        }
+      } catch (err) {
+        console.error("加载订单异常: ", err);
+      }
+    }
+    // 无订单ID或查询失败时，用传入参数兜底
+    renderOrder({});
+  }
+
+  function setTab(which) {
+    if (which === "wechat") {
+      tabWeChat.classList.add("active");
+      tabAlipay.classList.remove("active");
+      wechatBox.style.display = "block";
+      alipayBox.style.display = "none";
+    } else {
+      tabWeChat.classList.remove("active");
+      tabAlipay.classList.add("active");
+      wechatBox.style.display = "none";
+      alipayBox.style.display = "block";
+    }
+    currentMethod = which;
+  }
+
+  tabWeChat.addEventListener("click", () => setTab("wechat"));
+  tabAlipay.addEventListener("click", () => setTab("alipay"));
+
+  document.getElementById("payBtn").addEventListener("click", () => {
+    if (currentMethod === "wechat") {
+      alert("请在微信中打开“扫一扫”，对准当前页面的微信二维码完成支付。");
+    } else {
+      alert("请在支付宝中打开“扫一扫”，对准当前页面的支付宝二维码完成支付。");
+    }
+  });
+
+  loadOrder();
+</script>
+</body>
+</html>

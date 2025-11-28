@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>AutoPay 后台工具 - 生成投保订单</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="global.css" />
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="header">AutoPay 投保订单生成工具（后台）</div>
+    <p class="desc">
+      填写车牌号 / 保费 / 保险期限，上传投保单图片和微信收款码，点击“生成订单”后系统会自动：
+      创建订单ID → 上传所有文件到 Supabase → 写入 insurance_orders 表。
+    </p>
+
+    <label>车牌号</label>
+    <input type="text" id="plate" placeholder="例如：鲁UF9598" />
+
+    <label>保费金额（元）</label>
+    <input type="number" step="0.01" id="fee" placeholder="例如：17860.18" />
+
+    <label>保险期限</label>
+    <textarea id="period" rows="2"
+      placeholder="例如：自 2025 年 12 月 10 日 00 时 00 分起至 2026 年 12 月 09 日 24 时 00 分止。"></textarea>
+
+    <label>投保单图片（可多张 PNG/JPG）</label>
+    <input type="file" id="policyFiles" multiple accept="image/png,image/jpeg" />
+    <p class="small">建议将 Excel 投保单导出为多张图片后上传。</p>
+
+    <label>微信收款二维码图片</label>
+    <input type="file" id="wechatFile" accept="image/png,image/jpeg" />
+    <p class="small">微信内生成本次保费金额固定二维码后截图或导出上传。</p>
+
+    <button id="genBtn">生成订单并写入 Supabase</button>
+
+    <div class="log" id="logBox"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = "https://pefccznphgacswztqzrp.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBlZmNjem5waGdhY3N3enRxenJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxNTQwMTgsImV4cCI6MjA3OTczMDAxOH0.nz5gdOBpGzWIRm8qU49O0JFCyMc3csmHwhNA_YkpixY";
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const logBox = document.getElementById("logBox");
+    function log(msg) {
+      const time = new Date().toLocaleTimeString();
+      logBox.textContent += "[" + time + "] " + msg + "\n";
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    async function generateOrderId(plate) {
+      const now = new Date();
+      const yyyy = now.getFullYear().toString();
+      const mm = String(now.getMonth() + 1).padStart(2, "0");
+      const dd = String(now.getDate()).padStart(2, "0");
+      const datePart = yyyy + mm + dd;
+      const digits = (plate.match(/\d+/g) || []).join("") || "0000";
+      const prefix = datePart + digits;
+      log("生成订单ID前缀: " + prefix + "，统计当天已有订单数...");
+      const { count, error } = await supabaseClient
+        .from("insurance_orders")
+        .select("id", { count: "exact", head: true })
+        .like("id", prefix + "%");
+      if (error) {
+        log("统计订单数量失败: " + error.message);
+        throw error;
+      }
+      const seq = String((count || 0) + 1).padStart(3, "0");
+      const orderId = prefix + seq;
+      log("已生成订单ID: " + orderId);
+      return orderId;
+    }
+
+    async function uploadFile(bucket, path, file) {
+      log(`上传文件到 ${bucket}/${path} ...`);
+      const { data, error } = await supabaseClient
+        .storage
+        .from(bucket)
+        .upload(path, file, { upsert: true });
+      if (error) {
+        log("上传失败: " + error.message);
+        throw error;
+      }
+      const publicUrl = SUPABASE_URL + "/storage/v1/object/public/" + bucket + "/" + path;
+      log("上传成功，公共URL: " + publicUrl);
+      return publicUrl;
+    }
+
+    async function handleGenerate() {
+      const plate = document.getElementById("plate").value.trim();
+      const feeStr = document.getElementById("fee").value.trim();
+      const period = document.getElementById("period").value.trim();
+      const policyInput = document.getElementById("policyFiles");
+      const wechatInput = document.getElementById("wechatFile");
+
+      if (!plate || !feeStr) {
+        alert("车牌号和保费金额必填");
+        return;
+      }
+      const fee = parseFloat(feeStr);
+      if (isNaN(fee) || fee <= 0) {
+        alert("保费金额不正确");
+        return;
+      }
+
+      const genBtn = document.getElementById("genBtn");
+      genBtn.disabled = true;
+      logBox.textContent = "";
+      log("开始生成订单...");
+
+      try {
+        const orderId = await generateOrderId(plate);
+
+        const policyUrls = [];
+        const files = policyInput.files;
+        if (!files || files.length === 0) {
+          log("未上传投保单图片，仍将创建订单，但建议上传投保单。");
+        } else {
+          for (let i = 0; i < files.length; i++) {
+            const f = files[i];
+            const ext = f.name.split(".").pop();
+            const path = `${orderId}/policy_${i + 1}.${ext}`;
+            const url = await uploadFile("insure-policy", path, f);
+            policyUrls.push(url);
+          }
+        }
+
+        let wechatUrl = null;
+        if (wechatInput.files && wechatInput.files[0]) {
+          const wfile = wechatInput.files[0];
+          const ext = wfile.name.split(".").pop();
+          const path = `${orderId}/wechat_qr.${ext}`;
+          wechatUrl = await uploadFile("insure-wechat", path, wfile);
+        } else {
+          log("未上传微信收款二维码，将只支持支付宝支付二维码。");
+        }
+
+        const subject = `中国人寿财险${plate}机动车商业保险`;
+        const encoded = encodeURIComponent(subject);
+        const alipayUrl = `https://userpay.huilaitongpay.com/api/anon/toMchInfoPay?mchNo=H1758191438&userId=100345&orderSubject=${encoded}&isAliLite=false`;
+        log("已生成支付宝支付链接: " + alipayUrl);
+
+        log("写入 insurance_orders 表...");
+        const { error: insertError } = await supabaseClient
+          .from("insurance_orders")
+          .insert({
+            id: orderId,
+            plate: plate,
+            fee: fee,
+            period: period,
+            policy_images: policyUrls,
+            wechat_qr_url: wechatUrl,
+            alipay_qr_url: alipayUrl,
+            status: "pending"
+          });
+        if (insertError) {
+          log("插入订单失败: " + insertError.message);
+          throw insertError;
+        }
+        log("订单插入成功。");
+
+        const base = "https://autopayformal-4rcfm2xgx-jhpcicsystem.vercel.app";
+        const verifyUrl = `${base}/verify.html?id=${orderId}`;
+        const signUrl = `${base}/signature.html?id=${orderId}`;
+        const payUrl = `${base}/pay.html?id=${orderId}`;
+        log("投保单确认页: " + verifyUrl);
+        log("签字页: " + signUrl);
+        log("支付页: " + payUrl);
+
+        log("\n========== 生成结果 ==========");
+        log("订单ID: " + orderId);
+        log("确认页: " + verifyUrl);
+        log("签字页: " + signUrl);
+        log("支付页: " + payUrl);
+        log("\n可发给客户的建议步骤：");
+        log("1. 先发送确认链接: " + verifyUrl);
+        log("2. 客户确认后，系统引导到签字页与支付页。");
+
+        alert("订单生成完成，详情见下方日志。");
+      } catch (e) {
+        console.error(e);
+        log("异常: " + (e && e.message ? e.message : e));
+        alert("生成过程中出现错误：" + (e && e.message ? e.message : "请查看日志。"));
+      } finally {
+        genBtn.disabled = false;
+      }
+    }
+
+    document.getElementById("genBtn").addEventListener("click", handleGenerate);
+  </script>
+</body>
+
+</html>
